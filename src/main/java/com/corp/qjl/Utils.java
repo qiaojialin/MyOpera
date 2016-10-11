@@ -1,13 +1,5 @@
 package com.corp.qjl;
 
-import edu.stanford.nlp.ling.CoreAnnotations;
-import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.pipeline.StanfordCoreNLP;
-import edu.stanford.nlp.trees.Tree;
-import edu.stanford.nlp.trees.TreeCoreAnnotations;
-import edu.stanford.nlp.util.ArrayCoreMap;
-import edu.stanford.nlp.util.CoreMap;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -15,40 +7,31 @@ import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.dom4j.io.XMLWriter;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
+import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Created by Administrator on 2016/10/5.
+ * Created by qiaojialin on 2016/10/5.
  */
 class Utils {
 
-    //人物关系抽取
+    //师徒关系抽取
     static void extractRelationship(Map<String, List<String>> referedNames, Map<String, String> documents) throws IOException {
         //DocumentHelper提供了创建Document对象的方法
         Document document = DocumentHelper.createDocument();
         //添加节点信息
         Element xml_root = document.addElement("relations");
 
-//        int a = 0;
-
         //处理每一段文档
         for(String name: documents.keySet()) {
             String doc = documents.get(name).replaceAll("\n", "。");
-//            if(a == 10)
-//                break;
-//            a++;
 
             System.out.println();
             System.out.println(doc);
 
             List<String> refers = referedNames.get(name);
-
             String[] my_sentences = doc.split("[.]|[!?]+|[。]|[！？]+|[，]");
 
             for(int i=0; i<my_sentences.length; i++) {
@@ -57,7 +40,7 @@ class Utils {
                     continue;
 
                 Pattern teacher = Pattern.compile(".*师从.*|.*从师.*|.*向.*学.*|.*受教于.*|.*拜.*|.*老师.*|" +
-                        ".*被.*收为.*|.*传授.*|.*为师.*|.*得.*真传.*|.*为.*弟子.*");
+                        ".*被.*收为.*|.*传授.*|.*为师.*|.*得.*真传.*|.*为.*弟子.*|.*受.*指导.*");
                 Matcher match_teacher = teacher.matcher(my_sentence);
                 if(match_teacher.matches()) {
                     for(String refer: refers) {
@@ -77,6 +60,7 @@ class Utils {
                 Pattern student = Pattern.compile(".*收.*为.*|.*学员.*|.*培养.*");
                 Matcher match_student = student.matcher(my_sentence);
                 if(match_student.matches()) {
+                    System.out.println(my_sentence);
                     for(String refer: refers) {
                         if(my_sentence.contains(refer)) {
                             Element xml_relation = xml_root.addElement("relation");
@@ -91,23 +75,6 @@ class Utils {
                     System.out.println("本句话中有徒弟："+ my_sentence);
                 }
 
-                Pattern teach_student = Pattern.compile(".*培养.*");
-                Matcher match_teach_student = teach_student.matcher(my_sentence);
-                if(match_teach_student.matches()) {
-                    for(String refer: refers) {
-                        if(my_sentences[i+1].contains(refer)) {
-                            Element xml_relation = xml_root.addElement("relation");
-                            Element xml_name1 = xml_relation.addElement("name1");
-                            xml_name1.setText(name);
-                            Element xml_type = xml_relation.addElement("type");
-                            xml_type.setText("师徒");
-                            Element xml_name2 = xml_relation.addElement("name2");
-                            xml_name2.setText(refer);
-                        }
-                    }
-                    System.out.println("下句话中有徒弟：" + my_sentence);
-                }
-
             }
         }
         Writer fileWriter = new FileWriter("实体关系抽取.xml");
@@ -118,6 +85,7 @@ class Utils {
 
     }
 
+    //将命名实体识别xml中的信息提取出来构造成一个name-list<refer>的map结构
     static Map<String, List<String>> extractReferedNames(String path) throws DocumentException {
         Map<String, List<String>> referedNames = new HashMap<String, List<String>>();
         SAXReader reader = new SAXReader();
@@ -138,46 +106,43 @@ class Utils {
     }
 
 
-    //命名实体识别
-    static void extractNames(Map<String, String> documents, List<String> names) throws IOException {
-        //DocumentHelper提供了创建Document对象的方法
-        Document document = DocumentHelper.createDocument();
-        //添加节点信息
-        Element xml_root = document.addElement("documents");
-
-        for (String person : documents.keySet()) {
-            String doc = documents.get(person);
-            Element xml_doc = xml_root.addElement("doc");
-            xml_doc.addAttribute("name", person);
-            for(String name: names) {
-                if(name.equals(person))
-                    continue;
-                if(doc.contains(name)) {
-                    Element xml_name = xml_doc.addElement("refer");
-                    xml_name.setText(name);
-                }
-            }
-        }
-        Writer fileWriter = new FileWriter("命名实体识别.xml");
-        XMLWriter xmlWriter = new XMLWriter(fileWriter);
-        xmlWriter.write(document);
-        xmlWriter.flush();
-        xmlWriter.close();
-    }
-
-    static List<String> readNames(String path) throws DocumentException {
+    //将所有京剧名家姓名转化为jieba用户字典
+    static void convertNamesToJiebaDic(String sourcePath, String desPath) throws DocumentException, IOException {
         SAXReader reader = new SAXReader();
-        Document document = reader.read(new File(path));
+        Document document = reader.read(new File(sourcePath));
         Element root = document.getRootElement();
         String tag_name = "name";
-        List<String> names = new ArrayList<String>();
+        FileWriter writer = new FileWriter(desPath);
         for (Iterator i = root.elementIterator(tag_name); i.hasNext();) {
             Element name = (Element) i.next();
-            names.add(name.getText());
+            String name_text = name.getText();
+            writer.write(name_text + " " + "nr\n");
         }
-        return names;
+        writer.close();
     }
 
+    static Map<String, String> readFileFolder(String path) throws Exception {
+
+        Map<String, String> documents = new HashMap<String, String>();
+        File folder = new File(path);
+        File[] files = folder.listFiles();
+        for(File file: files) {
+            String name = file.getName().substring(0, file.getName().indexOf('.'));
+            String text = "";
+            InputStreamReader read = new InputStreamReader(new FileInputStream(file), "GBK");//考虑到编码格式
+            BufferedReader bufferedReader = new BufferedReader(read);
+            String lineTxt = null;
+            while((lineTxt = bufferedReader.readLine()) != null){
+                text += lineTxt;
+            }
+            read.close();
+            documents.put(name, text);
+        }
+        return documents;
+    }
+
+
+    //读取所有爬虫爬到的内容，将结果保存到一个name-dis的map
     static Map<String, String> readDiss(String path) throws DocumentException {
         SAXReader reader = new SAXReader();
         Document document = reader.read(new File(path));

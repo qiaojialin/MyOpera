@@ -2,6 +2,7 @@
 <project version="4">
   <component name="Encoding" defaultCharsetForPropertiesFiles="UTF-8">
     <file url="file://$PROJECT_DIR$/src/main/java/com/corp/qjl/MyOpera.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources/人物介绍/刘云亭.txt" charset="GBK" />
     <file url="PROJECT" charset="UTF-8" />
   </component>
 </project>
